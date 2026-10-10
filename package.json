@@ -1,0 +1,19 @@
+{
+  "name": "com.basis.steamlobby",
+  "version": "0.1.0",
+  "displayName": "Basis Steam Lobby",
+  "description": "Steam lobbies for Basis, on top of the Basis Steam Transport package. Adds a Steam Lobbies menu panel: host a session and open a Steam lobby for it, browse friends' and public lobbies, invite friends, and join over the Steam relay with no port forwarding. Desktop only (Windows, Linux, macOS).",
+  "author": {
+    "name": "BasisVR",
+    "url": "https://github.com/BasisVR"
+  },
+  "license": "MIT",
+  "vpmDependencies": {
+    "com.basis.common": "0.0.1",
+    "com.basis.sdk": "0.0.1",
+    "com.basis.framework": "0.0.1",
+    "com.basis.server": "1.0.0",
+    "com.basis.transport.litenetlib": "1.0.0",
+    "com.basis.transport.steam": "0.1.0"
+  }
+}

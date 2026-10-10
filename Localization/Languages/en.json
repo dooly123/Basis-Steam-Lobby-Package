@@ -1,0 +1,246 @@
+{
+  "code": "en",
+  "nativeName": "English",
+  "entries": [
+    {
+      "key": "steam.lobbies.title",
+      "value": "Steam Lobbies"
+    },
+    {
+      "key": "steam.lobbies.status.title",
+      "value": "Steam"
+    },
+    {
+      "key": "steam.lobbies.status.ready",
+      "value": "Signed in to Steam as {0}."
+    },
+    {
+      "key": "steam.lobbies.username",
+      "value": "Username"
+    },
+    {
+      "key": "steam.lobbies.host.title",
+      "value": "Host a lobby"
+    },
+    {
+      "key": "steam.lobbies.host.description",
+      "value": "Run a session on this machine and open a Steam lobby for it. Friends join through Steam, so no port forwarding is needed."
+    },
+    {
+      "key": "steam.lobbies.host.name",
+      "value": "Lobby name"
+    },
+    {
+      "key": "steam.lobbies.host.visibility",
+      "value": "Who can join"
+    },
+    {
+      "key": "steam.lobbies.visibility.friendsOnly",
+      "value": "Friends"
+    },
+    {
+      "key": "steam.lobbies.visibility.public",
+      "value": "Anyone"
+    },
+    {
+      "key": "steam.lobbies.visibility.private",
+      "value": "Invite only"
+    },
+    {
+      "key": "steam.lobbies.host.members",
+      "value": "Max players"
+    },
+    {
+      "key": "steam.lobbies.host.worldUrl",
+      "value": "World link (optional)"
+    },
+    {
+      "key": "steam.lobbies.host.worldPassword",
+      "value": "World password"
+    },
+    {
+      "key": "steam.lobbies.host.button",
+      "value": "Host lobby"
+    },
+    {
+      "key": "steam.lobbies.browse.title",
+      "value": "Join a lobby"
+    },
+    {
+      "key": "steam.lobbies.browse.description",
+      "value": "Lobbies hosted by your friends, and public lobbies."
+    },
+    {
+      "key": "steam.lobbies.browse.refresh",
+      "value": "Refresh"
+    },
+    {
+      "key": "steam.lobbies.browse.searching",
+      "value": "Searching for lobbies."
+    },
+    {
+      "key": "steam.lobbies.browse.empty",
+      "value": "No lobbies found"
+    },
+    {
+      "key": "steam.lobbies.browse.none",
+      "value": "Pick a lobby to see who is hosting and which world it uses."
+    },
+    {
+      "key": "steam.lobbies.browse.entry",
+      "value": "{0} ({1}/{2})"
+    },
+    {
+      "key": "steam.lobbies.browse.join",
+      "value": "Join"
+    },
+    {
+      "key": "steam.lobbies.details",
+      "value": "Host: {0}\nWorld: {1}\nPlayers: {2}/{3}"
+    },
+    {
+      "key": "steam.lobbies.details.noWorld",
+      "value": "Not set"
+    },
+    {
+      "key": "steam.lobbies.details.incompatible",
+      "value": "This lobby runs Basis network version {0}; you have {1}."
+    },
+    {
+      "key": "steam.lobbies.session.title",
+      "value": "Current lobby"
+    },
+    {
+      "key": "steam.lobbies.session.overlay",
+      "value": "Invite with the Steam overlay"
+    },
+    {
+      "key": "steam.lobbies.session.friend",
+      "value": "Friend"
+    },
+    {
+      "key": "steam.lobbies.session.noFriends",
+      "value": "No friends online"
+    },
+    {
+      "key": "steam.lobbies.session.invite",
+      "value": "Send invite"
+    },
+    {
+      "key": "steam.lobbies.session.invited",
+      "value": "Invite sent to {0}."
+    },
+    {
+      "key": "steam.lobbies.session.leave",
+      "value": "Leave lobby"
+    },
+    {
+      "key": "steam.lobbies.session.left",
+      "value": "You left the lobby."
+    },
+    {
+      "key": "steam.lobby.defaultName",
+      "value": "{0}'s lobby"
+    },
+    {
+      "key": "steam.status.checkingWorld",
+      "value": "Checking the world."
+    },
+    {
+      "key": "steam.status.startingHost",
+      "value": "Starting your session."
+    },
+    {
+      "key": "steam.status.publishing",
+      "value": "Opening the Steam lobby."
+    },
+    {
+      "key": "steam.status.ready",
+      "value": "Your Steam lobby is open."
+    },
+    {
+      "key": "steam.status.joining",
+      "value": "Joining the Steam lobby."
+    },
+    {
+      "key": "steam.status.hostLeft",
+      "value": "The host closed the lobby."
+    },
+    {
+      "key": "steam.error.unavailable",
+      "value": "Steam is not available: {0}"
+    },
+    {
+      "key": "steam.error.loggedOut",
+      "value": "Steam is running but you are not signed in."
+    },
+    {
+      "key": "steam.error.createFailed",
+      "value": "Steam could not create the lobby."
+    },
+    {
+      "key": "steam.error.joinFailed",
+      "value": "Could not join that lobby. It may be full, closed or invite only."
+    },
+    {
+      "key": "steam.error.ownLobby",
+      "value": "That is your own lobby."
+    },
+    {
+      "key": "steam.error.version",
+      "value": "That lobby runs Basis network version {0}; you have {1}."
+    },
+    {
+      "key": "steam.error.noHost",
+      "value": "That lobby has no host."
+    },
+    {
+      "key": "steam.error.publishFailed",
+      "value": "Your session is running, but the Steam lobby could not be opened: {0}"
+    },
+    {
+      "key": "steam.error.username",
+      "value": "Enter a username first."
+    },
+    {
+      "key": "steam.error.busy",
+      "value": "A connection is already in progress. Wait for it to finish, then try again."
+    },
+    {
+      "key": "steam.error.overlay",
+      "value": "The Steam overlay is not available. Use the friend list below instead."
+    },
+    {
+      "key": "steam.error.invite",
+      "value": "Steam did not send the invite."
+    },
+    {
+      "key": "steam.error.generic",
+      "value": "Something went wrong with Steam."
+    },
+    {
+      "key": "steam.world.error.emptyUrl",
+      "value": "Enter the world's link."
+    },
+    {
+      "key": "steam.world.error.emptyPassword",
+      "value": "Enter the world's password."
+    },
+    {
+      "key": "steam.world.error.invalidUrl",
+      "value": "That world link is not valid."
+    },
+    {
+      "key": "steam.world.error.notRemote",
+      "value": "Use an http or https link. Friends cannot download a world from your disk."
+    },
+    {
+      "key": "steam.world.error.unreadable",
+      "value": "The world could not be read. Check the link and the password."
+    },
+    {
+      "key": "steam.world.error.notWorld",
+      "value": "That file is not a world."
+    }
+  ]
+}
