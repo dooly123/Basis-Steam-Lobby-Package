@@ -31,7 +31,7 @@ namespace Basis.Network.Steam
         public int VirtualPort, MemberCount, MaxMembers;
         public ushort Version;
         public bool IsHost;
-        public bool IsCompatible => Version == BasisNetworkVersion.ServerVersion;
+        public bool IsCompatible => Version == BasisNetworkVersion.ServerVersion || Version == BasisNetworkVersion.LegacyLoginVersion;
         public BasisSteamLobbyState Clone()
         {
             return (BasisSteamLobbyState)MemberwiseClone();

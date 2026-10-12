@@ -216,7 +216,7 @@ namespace Basis.Network.Steam
                 };
                 BasisMainMenu.Close();
                 BasisCursorManagement.OnReset();
-                await BasisConnectionService.ConnectAsync(entry, userName, false);
+                await BasisConnectionService.ConnectAsync(entry, userName, false, state.Version == BasisNetworkVersion.LegacyLoginVersion);
                 return true;
             }
             finally
