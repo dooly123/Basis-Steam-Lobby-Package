@@ -2,12 +2,15 @@ using Basis.BasisUI;
 using Basis.Network.Core;
 using Basis.Scripts.Common;
 using Basis.Scripts.Networking;
+using Basis.Scripts.UI.UI_Panels;
 using Steamworks;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using Unity.Scripting.LifecycleManagement;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace Basis.Network.Steam
 {
@@ -18,23 +21,59 @@ namespace Basis.Network.Steam
         private readonly List<string> visibilityEntries = new List<string> { nameof(BasisSteamLobbyVisibility.FriendsOnly), nameof(BasisSteamLobbyVisibility.Public), nameof(BasisSteamLobbyVisibility.Private) };
         private readonly List<string> visibilityKeys = new List<string> { "steam.lobbies.visibility.friendsOnly", "steam.lobbies.visibility.public", "steam.lobbies.visibility.private" };
         private readonly List<BasisSteamLobbyState> lobbies = new List<BasisSteamLobbyState>();
+        private readonly List<PanelElementDescriptor> lobbyCards = new List<PanelElementDescriptor>();
+        private readonly List<PanelButton> joinButtons = new List<PanelButton>();
         private readonly List<Friend> friends = new List<Friend>();
+        private readonly List<BasisDataStoreItemKeys.ItemKey> worlds = new List<BasisDataStoreItemKeys.ItemKey>();
         private BasisMenuPanel panel;
-        private PanelElementDescriptor statusGroup, hostGroup, browseGroup, sessionGroup, lobbyDetails;
-        private PanelTextField usernameField, lobbyNameField, worldUrlField;
-        private PanelPasswordField worldPasswordField;
-        private PanelDropdown visibilityDropdown, membersDropdown, lobbyDropdown, friendDropdown;
-        private PanelButton hostButton, refreshButton, joinButton, overlayButton, inviteButton, leaveButton;
+        private RectTransform listContainer;
+        private PanelElementDescriptor statusGroup, sessionGroup, emptyState;
+        private PanelDropdown friendDropdown;
+        private PanelButton hostButton, refreshButton, overlayButton, inviteButton, leaveButton;
+        private DialogBox<bool> hostDialog;
+        private PanelTextField lobbyNameField;
+        private PanelDropdown worldDropdown, visibilityDropdown, membersDropdown;
+        private PanelButton dialogHostButton;
         private bool searching;
+        [NoAutoStaticsCleanup] private static SteamLobbiesProvider instance;
         [RuntimeInitializeOnLoadMethod]
         public static void AddToMenu()
         {
-            BasisMenuBase<BasisMainMenu>.AddProvider(new SteamLobbiesProvider());
+            instance = new SteamLobbiesProvider();
+            BasisMenuBase<BasisMainMenu>.AddProvider(instance);
+            ServersProvider.HeaderActionBuilders.Remove(BuildServersButton);
+            ServersProvider.HeaderActionBuilders.Add(BuildServersButton);
+        }
+        private static void BuildServersButton(RectTransform headerActions)
+        {
+            PanelButton button = HotbarButton(headerActions, AddressableAssets.Sprites.People, BasisLocalization.Get(TitleKey), BasisLocalization.Get("steam.lobbies.servers.tooltip"));
+            button.OnClicked += () => instance?.RunAction();
+        }
+        private static PanelButton HotbarButton(RectTransform parent, string icon, string title, string tooltip)
+        {
+            PanelButton button = PanelButton.CreateNew(PanelButton.ButtonStyles.Hotbar, parent);
+            button.SetIcon(icon);
+            button.Descriptor.SetTitle(title);
+            button.Descriptor.SetTooltip(tooltip);
+            button.SetSize(new Vector2(150, 150));
+            button.Layout.flexibleWidth = 0f;
+            button.EnableIconHoverAnimation();
+            return button;
+        }
+        private static RectTransform ActionRow(RectTransform parent, string name)
+        {
+            RectTransform row = PanelElementDescriptor.BuildActionRow(parent, name);
+            if (row.TryGetComponent(out HorizontalLayoutGroup layout))
+            {
+                layout.childForceExpandWidth = false;
+                layout.childAlignment = TextAnchor.MiddleLeft;
+            }
+            return row;
         }
         public override string Title => BasisLocalization.Get(TitleKey);
-        public override string IconAddress => AddressableAssets.Sprites.Servers;
+        public override string IconAddress => AddressableAssets.Sprites.People;
         public override int Order => 31;
-        public override bool Hidden => false;
+        public override bool Hidden => true;
         public override void RunAction()
         {
             if (BasisMainMenu.ActiveMenuTitle == Title)
@@ -43,11 +82,11 @@ namespace Basis.Network.Steam
                 return;
             }
             panel = BasisMainMenu.CreateActiveMenu(BasisMenuPanel.PanelData.Standard(Title), BasisMenuPanel.PanelStyles.Page);
-            BoundButton?.BindActiveStateToAddressablesInstance(panel);
+            BasisMainMenu.FindProvider(ServersProvider.TitleStatic)?.BoundButton?.BindActiveStateToAddressablesInstance(panel);
             panel.OnInstanceReleased += OnPanelClosed;
             PanelTabPage page = PanelTabPage.CreateVertical(panel.Descriptor.ContentParent);
             page.Descriptor.SetTitle(Title);
-            page.Descriptor.SetIcon(AddressableAssets.Sprites.Servers);
+            page.Descriptor.SetIcon(AddressableAssets.Sprites.People);
             Build(page.Descriptor.ContentParent);
             BasisSteamLobbyService.LobbyChanged += OnLobbyChanged;
             BasisSteamSession.StatusChanged += SetStatus;
@@ -55,100 +94,63 @@ namespace Basis.Network.Steam
             if (BasisSteamLobbyService.EnsureReady())
             {
                 SetStatus(BasisLocalization.Get("steam.lobbies.status.ready", SteamClient.Name));
-                if (string.IsNullOrWhiteSpace(Text(usernameField)))
-                {
-                    usernameField.SetValueWithoutNotify(SteamClient.Name);
-                }
-                if (!BasisSteamLobbyService.InLobby)
-                {
-                    _ = SearchAsync();
-                }
+                _ = SearchAsync();
             }
             else
             {
                 SetStatus(BasisSteamLobbyService.LastError);
             }
             ApplyState();
-            panel.Descriptor.ForceRebuild();
         }
         private void Build(RectTransform container)
         {
+            RectTransform actions = ActionRow(container, "SteamLobbyActions");
+            PanelButton backButton = HotbarButton(actions, AddressableAssets.Sprites.Servers, ServersProvider.TitleStatic, BasisLocalization.Get("steam.lobbies.back"));
+            backButton.OnClicked += () => BasisMainMenu.OpenWithProvider(ServersProvider.TitleStatic);
+            hostButton = HotbarButton(actions, AddressableAssets.Sprites.Add, BasisLocalization.Get("steam.lobbies.host.short"), BasisLocalization.Get("steam.lobbies.host.description"));
+            hostButton.OnClicked += () => _ = ShowHostDialogAsync();
+            refreshButton = HotbarButton(actions, AddressableAssets.Sprites.Reset, BasisLocalization.Get("steam.lobbies.browse.refresh"), BasisLocalization.Get("steam.lobbies.browse.description"));
+            refreshButton.OnClicked += () => _ = SearchAsync();
+            overlayButton = HotbarButton(actions, AddressableAssets.Sprites.Link, BasisLocalization.Get("steam.lobbies.session.invite"), BasisLocalization.Get("steam.lobbies.session.overlay"));
+            overlayButton.OnClicked += OpenOverlay;
+            leaveButton = HotbarButton(actions, AddressableAssets.Sprites.Exit, BasisLocalization.Get("steam.lobbies.session.leaveShort"), BasisLocalization.Get("steam.lobbies.session.leave"));
+            leaveButton.OnClicked += () => _ = LeaveAsync();
             statusGroup = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, container);
             statusGroup.SetTitle(BasisLocalization.Get("steam.lobbies.status.title"));
-            usernameField = PanelTextField.CreateNewEntry(container);
-            usernameField.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.username"));
-            usernameField.SetValueWithoutNotify(BasisDataStore.LoadString(BasisConnectionService.UsernameFileName, string.Empty));
-            hostGroup = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, container);
-            hostGroup.SetTitle(BasisLocalization.Get("steam.lobbies.host.title"));
-            hostGroup.SetDescription(BasisLocalization.Get("steam.lobbies.host.description"));
-            RectTransform hostContent = hostGroup.ContentParent;
-            lobbyNameField = PanelTextField.CreateNewEntry(hostContent);
-            lobbyNameField.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.name"));
-            visibilityDropdown = PanelDropdown.CreateNewEntry(hostContent);
-            visibilityDropdown.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.visibility"));
-            visibilityDropdown.AssignLocalizedEntries(visibilityEntries, visibilityKeys);
-            visibilityDropdown.SetValueWithoutNotify(visibilityEntries[0]);
-            membersDropdown = PanelDropdown.CreateNewEntry(hostContent);
-            membersDropdown.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.members"));
-            List<string> members = new List<string>(memberChoices.Length);
-            for (int index = 0; index < memberChoices.Length; index++)
-            {
-                members.Add(memberChoices[index].ToString(CultureInfo.InvariantCulture));
-            }
-            membersDropdown.AssignEntries(members);
-            membersDropdown.SetValueWithoutNotify(BasisSteamSession.DefaultMaxMembers.ToString(CultureInfo.InvariantCulture));
-            worldUrlField = PanelTextField.CreateNewEntry(hostContent);
-            worldUrlField.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.worldUrl"));
-            worldPasswordField = PanelPasswordField.CreateNewEntry(hostContent);
-            worldPasswordField.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.worldPassword"));
-            hostButton = PanelButton.CreateNew(hostContent);
-            hostButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.button"));
-            hostButton.OnClicked += () => _ = HostAsync();
-            browseGroup = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, container);
-            browseGroup.SetTitle(BasisLocalization.Get("steam.lobbies.browse.title"));
-            browseGroup.SetDescription(BasisLocalization.Get("steam.lobbies.browse.description"));
-            RectTransform browseContent = browseGroup.ContentParent;
-            refreshButton = PanelButton.CreateNew(browseContent);
-            refreshButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.browse.refresh"));
-            refreshButton.OnClicked += () => _ = SearchAsync();
-            lobbyDropdown = PanelDropdown.CreateNew(PanelDropdown.DropdownStyles.EntryNoLabel, browseContent);
-            lobbyDropdown.OnValueChanged += _ => ShowSelectedLobby();
-            lobbyDetails = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, browseContent);
-            joinButton = PanelButton.CreateNew(browseContent);
-            joinButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.browse.join"));
-            joinButton.OnClicked += () => _ = JoinAsync();
             sessionGroup = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, container);
-            sessionGroup.SetTitle(BasisLocalization.Get("steam.lobbies.session.title"));
+            sessionGroup.SetIcon(AddressableAssets.GetSprite(AddressableAssets.Sprites.People));
             RectTransform sessionContent = sessionGroup.ContentParent;
-            overlayButton = PanelButton.CreateNew(sessionContent);
-            overlayButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.session.overlay"));
-            overlayButton.OnClicked += OpenOverlay;
             friendDropdown = PanelDropdown.CreateNewEntry(sessionContent);
             friendDropdown.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.session.friend"));
             inviteButton = PanelButton.CreateNew(sessionContent);
-            inviteButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.session.invite"));
+            inviteButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.session.sendInvite"));
             inviteButton.OnClicked += InviteSelectedFriend;
-            leaveButton = PanelButton.CreateNew(sessionContent);
-            leaveButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.session.leave"));
-            leaveButton.OnClicked += () => _ = LeaveAsync();
-            FillLobbies();
+            listContainer = container;
+            emptyState = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, container);
+            emptyState.SetTitle(BasisLocalization.Get("steam.lobbies.browse.empty"));
+            emptyState.SetDescription(BasisLocalization.Get("steam.lobbies.browse.emptyHint"));
+            RebuildLobbyCards();
         }
         private void OnPanelClosed()
         {
             BasisSteamLobbyService.LobbyChanged -= OnLobbyChanged;
             BasisSteamSession.StatusChanged -= SetStatus;
             BasisSteamSession.Failed -= SetStatus;
-            string userName = Text(usernameField);
-            if (!string.IsNullOrWhiteSpace(userName))
-            {
-                BasisDataStore.SaveString(userName.Trim(), BasisConnectionService.UsernameFileName);
-            }
             panel = null;
-            statusGroup = hostGroup = browseGroup = sessionGroup = lobbyDetails = null;
-            usernameField = lobbyNameField = worldUrlField = null;
-            worldPasswordField = null;
-            visibilityDropdown = membersDropdown = lobbyDropdown = friendDropdown = null;
-            hostButton = refreshButton = joinButton = overlayButton = inviteButton = leaveButton = null;
+            listContainer = null;
+            statusGroup = sessionGroup = emptyState = null;
+            friendDropdown = null;
+            hostButton = refreshButton = overlayButton = inviteButton = leaveButton = null;
+            hostDialog = null;
+            ClearDialogFields();
+            lobbyCards.Clear();
+            joinButtons.Clear();
+        }
+        private void ClearDialogFields()
+        {
+            lobbyNameField = null;
+            worldDropdown = visibilityDropdown = membersDropdown = null;
+            dialogHostButton = null;
         }
         private bool IsOpen => panel != null;
         private static string Text(PanelTextField field)
@@ -159,20 +161,100 @@ namespace Basis.Network.Steam
             }
             return field._inputField != null ? field._inputField.text : field.Value ?? string.Empty;
         }
-        private async Task HostAsync()
+        private async Task ShowHostDialogAsync()
         {
-            BasisSteamHostRequest request = new BasisSteamHostRequest
+            if (!IsOpen || hostDialog != null)
+            {
+                return;
+            }
+            DialogBox<bool> dialog = DialogBox<bool>.Create(panel, new Vector2(1170, 760), BasisLocalization.Get("steam.lobbies.host.title"), BasisLocalization.Get("steam.lobbies.host.description"), AddressableAssets.Sprites.Add);
+            if (dialog.Descriptor == null)
+            {
+                return;
+            }
+            hostDialog = dialog;
+            PanelButton exitButton = PanelButton.CreateNew(PanelButton.ButtonStyles.ExitButton, dialog.Descriptor.Header);
+            exitButton.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, 125);
+            exitButton.rectTransform.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 50);
+            exitButton.OnClicked += () => dialog.Cancel(false);
+            RectTransform content = dialog.Descriptor.ContentParent;
+            lobbyNameField = PanelTextField.CreateNewEntry(content);
+            lobbyNameField.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.name"));
+            lobbyNameField.SetValueWithoutNotify(SteamClient.IsValid ? SteamClient.Name : string.Empty);
+            worldDropdown = PanelDropdown.CreateNewEntry(content);
+            worldDropdown.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.world"));
+            FillWorlds();
+            _ = LoadWorldsAsync();
+            visibilityDropdown = PanelDropdown.CreateNewEntry(content);
+            visibilityDropdown.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.visibility"));
+            visibilityDropdown.AssignLocalizedEntries(visibilityEntries, visibilityKeys);
+            visibilityDropdown.SetValueWithoutNotify(visibilityEntries[0]);
+            membersDropdown = PanelDropdown.CreateNewEntry(content);
+            membersDropdown.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.members"));
+            List<string> members = new List<string>(memberChoices.Length);
+            for (int index = 0; index < memberChoices.Length; index++)
+            {
+                members.Add(memberChoices[index].ToString(CultureInfo.InvariantCulture));
+            }
+            membersDropdown.AssignEntries(members);
+            membersDropdown.SetValueWithoutNotify(BasisSteamSession.DefaultMaxMembers.ToString(CultureInfo.InvariantCulture));
+            PanelTabGroup actionRow = PanelTabGroup.CreateNew(content, LayoutDirection.HorizontalNoBackground);
+            actionRow.Descriptor.SetHeight(60);
+            dialogHostButton = PanelButton.CreateNew(PanelButton.ButtonStyles.AcceptButton, actionRow.TabButtonParent);
+            dialogHostButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.button"));
+            dialogHostButton.Descriptor.SetWidth(200);
+            dialogHostButton.Descriptor.SetHeight(60);
+            dialogHostButton.SetInteractable(!BasisSteamSession.Busy && BasisSteamClient.IsReady);
+            dialogHostButton.OnClicked += () =>
+            {
+                if (dialog.IsBusy)
+                {
+                    return;
+                }
+                BasisSteamHostRequest request = BuildHostRequest();
+                dialog.IsBusy = true;
+                dialog.CloseWithResult(true);
+                _ = HostAsync(request);
+            };
+            PanelButton cancelButton = PanelButton.CreateNew(PanelButton.ButtonStyles.CancelButton, actionRow.TabButtonParent);
+            cancelButton.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.host.cancel"));
+            cancelButton.Descriptor.SetWidth(200);
+            cancelButton.Descriptor.SetHeight(60);
+            cancelButton.OnClicked += () =>
+            {
+                if (dialog.IsBusy)
+                {
+                    return;
+                }
+                dialog.IsBusy = true;
+                dialog.CloseWithResult(false);
+            };
+            dialog.Descriptor.ForceRebuild();
+            await dialog.WaitAsync();
+            if (hostDialog == dialog)
+            {
+                hostDialog = null;
+                ClearDialogFields();
+            }
+        }
+        private BasisSteamHostRequest BuildHostRequest()
+        {
+            BasisDataStoreItemKeys.ItemKey world = SelectedWorld();
+            return new BasisSteamHostRequest
             {
                 LobbyName = Text(lobbyNameField),
-                WorldUrl = Text(worldUrlField),
-                WorldPassword = worldPasswordField.Password,
+                WorldUrl = world?.Url ?? string.Empty,
+                WorldPassword = world?.Pass ?? string.Empty,
                 Visibility = Enum.TryParse(visibilityDropdown.Value, out BasisSteamLobbyVisibility visibility) ? visibility : BasisSteamLobbyVisibility.FriendsOnly,
                 MaxMembers = int.TryParse(membersDropdown.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int maxMembers) ? maxMembers : BasisSteamSession.DefaultMaxMembers,
             };
-            hostButton.SetInteractable(false);
+        }
+        private async Task HostAsync(BasisSteamHostRequest request)
+        {
+            hostButton?.SetInteractable(false);
             try
             {
-                await BasisSteamSession.HostAsync(request, Text(usernameField));
+                await BasisSteamSession.HostAsync(request, null);
             }
             finally
             {
@@ -182,17 +264,16 @@ namespace Basis.Network.Steam
                 }
             }
         }
-        private async Task JoinAsync()
+        private async Task JoinAsync(BasisSteamLobbyState lobby)
         {
-            BasisSteamLobbyState selected = SelectedLobby();
-            if (selected == null)
+            if (lobby == null)
             {
                 return;
             }
-            joinButton.SetInteractable(false);
+            SetJoinInteractable(false);
             try
             {
-                await BasisSteamSession.JoinAsync(selected.LobbyId, Text(usernameField));
+                await BasisSteamSession.JoinAsync(lobby.LobbyId, null);
             }
             finally
             {
@@ -204,7 +285,7 @@ namespace Basis.Network.Steam
         }
         private async Task LeaveAsync()
         {
-            leaveButton.SetInteractable(false);
+            leaveButton?.SetInteractable(false);
             await BasisSteamSession.LeaveAsync();
             if (IsOpen)
             {
@@ -221,12 +302,19 @@ namespace Basis.Network.Steam
             }
             searching = true;
             refreshButton?.SetInteractable(false);
-            lobbyDetails?.SetDescription(BasisLocalization.Get("steam.lobbies.browse.searching"));
+            emptyState?.SetTitle(BasisLocalization.Get("steam.lobbies.browse.searching"));
             try
             {
                 List<BasisSteamLobbyState> found = await BasisSteamLobbyService.SearchAsync();
                 lobbies.Clear();
-                lobbies.AddRange(found);
+                ulong self = SteamClient.IsValid ? SteamClient.SteamId.Value : 0;
+                for (int index = 0; index < found.Count; index++)
+                {
+                    if (found[index].HostSteamId != self)
+                    {
+                        lobbies.Add(found[index]);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -238,62 +326,52 @@ namespace Basis.Network.Steam
             }
             if (IsOpen)
             {
-                FillLobbies();
+                emptyState?.SetTitle(BasisLocalization.Get("steam.lobbies.browse.empty"));
+                RebuildLobbyCards();
                 ApplyState();
             }
         }
-        private void FillLobbies()
+        private void RebuildLobbyCards()
         {
-            List<string> entries = new List<string>(lobbies.Count);
-            List<string> labels = new List<string>(lobbies.Count);
-            for (int index = 0; index < lobbies.Count; index++)
+            for (int index = 0; index < lobbyCards.Count; index++)
             {
-                BasisSteamLobbyState lobby = lobbies[index];
-                entries.Add(lobby.LobbyId.ToString(CultureInfo.InvariantCulture));
-                labels.Add(BasisLocalization.Get("steam.lobbies.browse.entry", DisplayName(lobby), lobby.MemberCount, lobby.MaxMembers));
-            }
-            if (entries.Count == 0)
-            {
-                entries.Add(string.Empty);
-                labels.Add(BasisLocalization.Get("steam.lobbies.browse.empty"));
-            }
-            lobbyDropdown.AssignEntries(entries, labels);
-            lobbyDropdown.SetValueWithoutNotify(entries[0]);
-            ShowSelectedLobby();
-        }
-        private BasisSteamLobbyState SelectedLobby()
-        {
-            if (lobbyDropdown == null || !ulong.TryParse(lobbyDropdown.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out ulong lobbyId))
-            {
-                return null;
-            }
-            for (int index = 0; index < lobbies.Count; index++)
-            {
-                if (lobbies[index].LobbyId == lobbyId)
+                if (lobbyCards[index] != null)
                 {
-                    return lobbies[index];
+                    UnityEngine.Object.Destroy(lobbyCards[index].gameObject);
                 }
             }
-            return null;
-        }
-        private void ShowSelectedLobby()
-        {
-            if (lobbyDetails == null)
+            lobbyCards.Clear();
+            joinButtons.Clear();
+            if (listContainer == null)
             {
                 return;
             }
-            BasisSteamLobbyState selected = SelectedLobby();
-            if (selected == null)
+            for (int index = 0; index < lobbies.Count; index++)
             {
-                lobbyDetails.SetTitle(string.Empty);
-                lobbyDetails.SetDescription(BasisLocalization.Get("steam.lobbies.browse.none"));
+                BasisSteamLobbyState lobby = lobbies[index];
+                PanelElementDescriptor card = PanelElementDescriptor.CreateNew(PanelElementDescriptor.ElementStyles.Group, listContainer);
+                if (card == null)
+                {
+                    continue;
+                }
+                card.SetIcon(AddressableAssets.GetSprite(AddressableAssets.Sprites.World));
+                card.SetTitle(BasisLocalization.Get("steam.lobbies.browse.entry", DisplayName(lobby), lobby.MemberCount, lobby.MaxMembers));
+                card.SetDescription(Describe(lobby));
+                RectTransform row = PanelElementDescriptor.BuildActionRow(card.ContentParent, "SteamLobbyCardActions");
+                PanelButton join = PanelButton.CreateNew(row);
+                join.Descriptor.SetTitle(BasisLocalization.Get("steam.lobbies.browse.join"));
+                join.OnClicked += () => _ = JoinAsync(lobby);
+                lobbyCards.Add(card);
+                joinButtons.Add(join);
             }
-            else
+            emptyState?.rectTransform.SetAsLastSibling();
+        }
+        private void SetJoinInteractable(bool interactable)
+        {
+            for (int index = 0; index < joinButtons.Count && index < lobbies.Count; index++)
             {
-                lobbyDetails.SetTitle(DisplayName(selected));
-                lobbyDetails.SetDescription(Describe(selected));
+                joinButtons[index]?.SetInteractable(interactable && lobbies[index].IsCompatible);
             }
-            joinButton?.SetInteractable(selected != null && selected.IsCompatible && !BasisSteamSession.Busy);
         }
         private void OnLobbyChanged(BasisSteamLobbyState state)
         {
@@ -307,20 +385,21 @@ namespace Basis.Network.Steam
             BasisSteamLobbyState current = BasisSteamLobbyService.Current;
             bool inLobby = current != null;
             bool busy = BasisSteamSession.Busy;
-            hostGroup.SetActive(!inLobby);
-            browseGroup.SetActive(!inLobby);
+            bool ready = BasisSteamClient.IsReady;
+            hostButton.SetInteractable(!busy && ready && !inLobby);
+            refreshButton.SetInteractable(!searching && ready);
+            overlayButton.SetInteractable(inLobby);
+            leaveButton.SetInteractable(inLobby);
+            dialogHostButton?.SetInteractable(!busy && ready);
             sessionGroup.SetActive(inLobby);
-            hostButton.SetInteractable(!busy && BasisSteamClient.IsReady);
-            refreshButton.SetInteractable(!searching && BasisSteamClient.IsReady);
-            BasisSteamLobbyState selected = SelectedLobby();
-            joinButton.SetInteractable(!busy && selected != null && selected.IsCompatible);
-            leaveButton.SetInteractable(true);
             if (inLobby)
             {
-                sessionGroup.SetTitle(DisplayName(current));
+                sessionGroup.SetTitle(BasisLocalization.Get("steam.lobbies.session.titleNamed", DisplayName(current)));
                 sessionGroup.SetDescription(Describe(current));
                 FillFriends();
             }
+            SetJoinInteractable(!busy);
+            emptyState.SetActive(lobbies.Count == 0);
             panel?.Descriptor.ForceRebuild();
         }
         private void FillFriends()
@@ -343,6 +422,77 @@ namespace Basis.Network.Steam
             friendDropdown.AssignEntries(entries, labels);
             friendDropdown.SetValueWithoutNotify(entries.Contains(previous) ? previous : entries[0]);
             inviteButton.SetInteractable(friends.Count > 0);
+        }
+        private async Task LoadWorldsAsync()
+        {
+            try
+            {
+                await BasisDataStoreItemKeys.EnsureLoaded();
+            }
+            catch (Exception ex)
+            {
+                BasisDebug.LogWarning($"Steam lobby could not read the library for worlds: {ex.Message}", BasisDebug.LogTag.Networking);
+                return;
+            }
+            if (worldDropdown != null)
+            {
+                FillWorlds();
+            }
+        }
+        private void FillWorlds()
+        {
+            string previous = worldDropdown.Value;
+            worlds.Clear();
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            BasisDataStoreItemKeys.ItemKey[] keys = BasisDataStoreItemKeys.DisplayKeys();
+            for (int index = 0; index < keys.Length; index++)
+            {
+                BasisDataStoreItemKeys.ItemKey key = keys[index];
+                if (key == null || key.Mode != BundledContentHolder.Mode.World || key.EmbeddedSettings.IsEmbedded || !IsRemote(key.Url) || !seen.Add(key.Url))
+                {
+                    continue;
+                }
+                worlds.Add(key);
+            }
+            List<string> entries = new List<string>(worlds.Count + 1) { string.Empty };
+            List<string> labels = new List<string>(worlds.Count + 1) { BasisLocalization.Get("steam.lobbies.host.world.none") };
+            for (int index = 0; index < worlds.Count; index++)
+            {
+                entries.Add(worlds[index].Url);
+                labels.Add(WorldName(worlds[index]));
+            }
+            worldDropdown.AssignEntries(entries, labels);
+            worldDropdown.SetValueWithoutNotify(entries.Contains(previous) ? previous : entries[0]);
+        }
+        private BasisDataStoreItemKeys.ItemKey SelectedWorld()
+        {
+            string url = worldDropdown?.Value;
+            if (string.IsNullOrEmpty(url))
+            {
+                return null;
+            }
+            for (int index = 0; index < worlds.Count; index++)
+            {
+                if (string.Equals(worlds[index].Url, url, StringComparison.OrdinalIgnoreCase))
+                {
+                    return worlds[index];
+                }
+            }
+            return null;
+        }
+        private static bool IsRemote(string url)
+        {
+            return Uri.TryCreate(url, UriKind.Absolute, out Uri uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+        }
+        private static string WorldName(BasisDataStoreItemKeys.ItemKey key)
+        {
+            if (CachedMetaData.TryGetMeta(key.Url, out CachedMetaData.CachedContent meta) && !string.IsNullOrWhiteSpace(meta.Name))
+            {
+                return meta.Name;
+            }
+            Uri uri = new Uri(key.Url);
+            string last = uri.Segments.Length > 0 ? Uri.UnescapeDataString(uri.Segments[uri.Segments.Length - 1]) : string.Empty;
+            return string.IsNullOrWhiteSpace(last) ? key.Url : last;
         }
         private void OpenOverlay()
         {
