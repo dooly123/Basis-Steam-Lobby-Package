@@ -13,6 +13,7 @@
     "com.basis.sdk": "0.0.1",
     "com.basis.framework": "0.0.1",
     "com.basis.server": "1.0.0",
+    "com.basis.provider.servers": "0.0.1",
     "com.basis.transport.litenetlib": "1.0.0",
     "com.basis.transport.steam": "0.1.0"
   }

@@ -7,16 +7,28 @@
       "value": "Steam Lobbies"
     },
     {
+      "key": "steam.lobbies.back",
+      "value": "Back to servers"
+    },
+    {
+      "key": "steam.lobbies.source",
+      "value": "Steam"
+    },
+    {
+      "key": "steam.lobbies.servers.tooltip",
+      "value": "Host a Steam lobby, browse lobbies and invite friends"
+    },
+    {
+      "key": "steam.lobbies.servers.address",
+      "value": "Steam lobby  •  Host: {0}  •  World: {1}"
+    },
+    {
       "key": "steam.lobbies.status.title",
       "value": "Steam"
     },
     {
       "key": "steam.lobbies.status.ready",
       "value": "Signed in to Steam as {0}."
-    },
-    {
-      "key": "steam.lobbies.username",
-      "value": "Username"
     },
     {
       "key": "steam.lobbies.host.title",
@@ -51,20 +63,16 @@
       "value": "Max players"
     },
     {
-      "key": "steam.lobbies.host.worldUrl",
-      "value": "World link (optional)"
+      "key": "steam.lobbies.host.world",
+      "value": "World"
     },
     {
-      "key": "steam.lobbies.host.worldPassword",
-      "value": "World password"
+      "key": "steam.lobbies.host.world.none",
+      "value": "Current world"
     },
     {
       "key": "steam.lobbies.host.button",
       "value": "Host lobby"
-    },
-    {
-      "key": "steam.lobbies.browse.title",
-      "value": "Join a lobby"
     },
     {
       "key": "steam.lobbies.browse.description",
@@ -81,10 +89,6 @@
     {
       "key": "steam.lobbies.browse.empty",
       "value": "No lobbies found"
-    },
-    {
-      "key": "steam.lobbies.browse.none",
-      "value": "Pick a lobby to see who is hosting and which world it uses."
     },
     {
       "key": "steam.lobbies.browse.entry",
@@ -107,10 +111,6 @@
       "value": "This lobby runs Basis network version {0}; you have {1}."
     },
     {
-      "key": "steam.lobbies.session.title",
-      "value": "Current lobby"
-    },
-    {
       "key": "steam.lobbies.session.overlay",
       "value": "Invite with the Steam overlay"
     },
@@ -124,7 +124,7 @@
     },
     {
       "key": "steam.lobbies.session.invite",
-      "value": "Send invite"
+      "value": "Invite"
     },
     {
       "key": "steam.lobbies.session.invited",
@@ -241,6 +241,30 @@
     {
       "key": "steam.world.error.notWorld",
       "value": "That file is not a world."
+    },
+    {
+      "key": "steam.lobbies.host.short",
+      "value": "Host"
+    },
+    {
+      "key": "steam.lobbies.host.cancel",
+      "value": "Cancel"
+    },
+    {
+      "key": "steam.lobbies.browse.emptyHint",
+      "value": "Lobbies your friends host, and public lobbies, show up here. Host one to get started."
+    },
+    {
+      "key": "steam.lobbies.session.leaveShort",
+      "value": "Leave"
+    },
+    {
+      "key": "steam.lobbies.session.sendInvite",
+      "value": "Send invite"
+    },
+    {
+      "key": "steam.lobbies.session.titleNamed",
+      "value": "In lobby: {0}"
     }
   ]
 }

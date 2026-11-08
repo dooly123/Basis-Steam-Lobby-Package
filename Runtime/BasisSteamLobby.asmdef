@@ -3,6 +3,7 @@
     "rootNamespace": "",
     "references": [
         "BasisSteamTransport",
+        "BasisServersProvider",
         "BasisNetworkCore",
         "Basis Framework",
         "BasisBundleManagement",

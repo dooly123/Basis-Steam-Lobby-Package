@@ -142,6 +142,7 @@ namespace Basis.Network.Steam
                     Password = pendingHost.SessionKey,
                     HasPassword = true,
                     Target = target,
+                    CanAutoConnect = false,
                 };
                 Status(BasisLocalization.Get("steam.status.startingHost"));
                 BasisMainMenu.Close();
@@ -213,6 +214,7 @@ namespace Basis.Network.Steam
                     Password = state.SessionKey,
                     HasPassword = !string.IsNullOrEmpty(state.SessionKey),
                     Target = target,
+                    CanAutoConnect = false,
                 };
                 BasisMainMenu.Close();
                 BasisCursorManagement.OnReset();
